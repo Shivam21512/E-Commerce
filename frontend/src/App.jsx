@@ -10,6 +10,7 @@ import { useCartStore } from "./stores/useCartStore";
 import { useEffect } from "react";
 import AdminPage from './pages/AdminPage';
 import CategoryPage from "./pages/CategoryPage";
+import CartPage from "./pages/CartPage";
 
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
 					       element={user?.role === "admin" ? <AdminPage/> : <Navigate to='/login' />}
 					/>
 					<Route path='/category/:category' element={<CategoryPage />} />
+					<Route path='/cart' element={user ? <CartPage /> : <Navigate to='/login' />} />
 
        </Routes>
      </div>
