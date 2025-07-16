@@ -28,57 +28,63 @@ const OrderSummary = () => {
   const formattedSavings = savings.toFixed(2);
 
 
-  const handlePayment = async () => {
+const handlePayment = async () => {
   const isScriptLoaded = await loadRazorpayScript();
   if (!isScriptLoaded) {
-    alert("Failed to load Razorpay SDK. Please check your internet.");
+    alert("Failed to load Razorpay SDK");
     return;
   }
 
   try {
-    // Convert total to paise
     const finalAmount = Math.round(total * 100);
 
-    // 1. Create Razorpay order from backend
-    const res = await axios.post("/payments/razorpay/create-order", {
-      products: cart,
-      couponCode: coupon ? coupon.code : null,
+    const res = await axios.post("/payments/create-order", {
       amount: finalAmount,
+      userId: user._id,
+      products: cart.map((item) => ({
+        product: item._id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      couponId: coupon?._id || null,
+      discountPercentage: coupon?.discountPercentage || 0,
     });
 
     const { orderId, amount, notes } = res.data;
 
-    // 2. Razorpay checkout options
-    const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: amount,
-      currency: "INR",
-      name: "E-Commerce Store",
-      description: "Purchase products",
-      order_id: orderId,
+// Store notes in a variable in the outer scope
+const razorpayNotes = notes;
 
-      handler: async function (response) {
-        try {
-          await axios.post("/payments/verify", {
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            notes: notes,
-          });
-          window.location.href = "/purchase-success";
-        } catch (err) {
-          console.error("Payment verification failed:", err);
-          alert("Payment verification failed. Please contact support.");
-        }
-      },
-      prefill: {
-        email: user.email,
-        name: user.name,
-      },
-      theme: {
-        color: "#10B981",
-      },
-    };
+const options = {
+  key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+  amount,
+  currency: "INR",
+  name: "E-Commerce Store",
+  description: "Purchase products",
+  order_id: orderId,
+  notes: razorpayNotes, // this goes to Razorpay UI
+  handler: async (response) => {
+    try {
+      await axios.post("/payments/verify", {
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+        notes: razorpayNotes, // ✅ persist it here!
+      });
+
+      // success redirect here
+    } catch (err) {
+      console.error("❌ Payment verification failed:", err);
+      alert("Payment verification Successfull");
+    }
+  },
+  prefill: {
+    name: user.name,
+    email: user.email,
+  },
+  theme: { color: "#10B981" },
+};
+
 
     const rzp = new window.Razorpay(options);
     rzp.open();
@@ -87,6 +93,7 @@ const OrderSummary = () => {
     alert("Payment failed. Try again.");
   }
 };
+
 
   // const handlePayment = async () => {
   //   const isScriptLoaded = await loadRazorpayScript();

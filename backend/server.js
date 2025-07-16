@@ -57,7 +57,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use("/api/payments/razorpay", paymentRoutes); // ✅ NEW
+app.use("/api/payments", paymentRoutes); // ✅ NEW
 
 
 app.listen(PORT, () => {

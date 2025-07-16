@@ -62,49 +62,60 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 export const verifyPayment = async (req, res) => {
-	try {
-		const {
-			razorpay_order_id,
-			razorpay_payment_id,
-			razorpay_signature,
-			couponId,
-			discountPercentage,
-			products,
-			totalAmount,
-			userId
-		} = req.body;
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      userId,
+      products,
+      totalAmount,
+      couponId,
+      discountPercentage
+    } = req.body;
 
-		// Signature verification
-		const expectedSignature = crypto
-			.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-			.update(`${razorpay_order_id}|${razorpay_payment_id}`)
-			.digest("hex");
+    // Verify signature
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
 
-		if (expectedSignature !== razorpay_signature) {
-			return res.status(400).json({ message: "Invalid signature" });
-		}
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Invalid signature" });
+    }
 
-		// Create order
-		const order = await Order.create({
-			user: userId,
-			products,
-			totalAmount,
-			razorpayOrderId: razorpay_order_id,
-			coupon: couponId || null,
-			discountPercentage: discountPercentage || 0,
-		});
+    // ✅ Format products as expected by Order schema
+    const formattedProducts = products.map(p => ({
+      product: p.id,  // Assuming frontend sends `id`
+      quantity: p.quantity,
+      price: p.price
+    }));
 
-		// Invalidate coupon
-		if (couponId) {
-			await Coupon.findByIdAndUpdate(couponId, { isActive: false });
-		}
+    // ✅ Create Order
+    const order = await Order.create({
+      user: userId,
+      products: formattedProducts,
+      totalAmount,
+      couponCode: couponId || null,
+      discountPercentage: discountPercentage || 0,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    });
 
-		res.json({ success: true, orderId: order._id });
-	} catch (error) {
-		console.error("Error in verifyPayment:", error.message);
-		res.status(500).json({ message: "Payment verification failed", error: error.message });
-	}
+    // ✅ Invalidate coupon
+    if (couponId) {
+      await Coupon.findByIdAndUpdate(couponId, { isActive: false });
+    }
+
+    res.status(200).json({ success: true, orderId: order._id });
+
+  } catch (error) {
+    console.error("Error in verifyPayment:", error.message);
+    res.status(500).json({ message: "Payment verification failed", error: error.message });
+  }
 };
+
 
 // export const verifyPayment = async (req, res) => {
 // 	try {
@@ -143,7 +154,7 @@ export const verifyPayment = async (req, res) => {
 // 				price: p.price,
 // 			})),
 // 			totalAmount: parsedProducts.reduce((sum, p) => sum + p.price * p.quantity, 0),
-// 			razorpayOrderId: razorpay_order_id,
+// 			razorpay_order_id: razorpay_order_id,
 // 			razorpayPaymentId: razorpay_payment_id,
 // 		});
 
